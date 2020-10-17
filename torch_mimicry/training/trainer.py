@@ -7,7 +7,7 @@ import time
 
 import torch
 
-import shutil
+import subprocess
 
 from torch_mimicry.training import scheduler, logger, metric_log
 from torch_mimicry.utils import common
@@ -339,7 +339,8 @@ class Trainer:
                     print("INFO: Saving checkpoints...")
                     self._save_model_checkpoints(global_step)
                     if upload_path is not None:
-                        shutil.copytree(self.log_dir, upload_path)
+                        call_string = 'cp -r ' + self.log_dir +  ' ' + upload_path
+                        subprocess.call(call_string, shell=True)
 
             print("INFO: Saving final checkpoints...")
             self._save_model_checkpoints(global_step)
