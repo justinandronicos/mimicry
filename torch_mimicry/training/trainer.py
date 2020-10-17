@@ -7,6 +7,8 @@ import time
 
 import torch
 
+import shutil
+
 from torch_mimicry.training import scheduler, logger, metric_log
 from torch_mimicry.utils import common
 
@@ -37,38 +39,41 @@ class Trainer:
         log_steps (int): Number of training steps before writing summaries to TensorBoard.
         save_steps (int): Number of training steps bfeore checkpointing.
     """
-    def __init__(self,
-                 netD,
-                 netG,
-                 optD,
-                 optG,
-                 dataloader,
-                 num_steps,
-                 log_dir='./log',
-                 n_dis=1,
-                 lr_decay=None,
-                 device=None,
-                 netG_ckpt_file=None,
-                 netD_ckpt_file=None,
-                 print_steps=1,
-                 vis_steps=500,
-                 log_steps=50,
-                 save_steps=5000,
-                 flush_secs=30):
+
+    def __init__(
+        self,
+        netD,
+        netG,
+        optD,
+        optG,
+        dataloader,
+        num_steps,
+        log_dir="./log",
+        n_dis=1,
+        lr_decay=None,
+        device=None,
+        netG_ckpt_file=None,
+        netD_ckpt_file=None,
+        print_steps=1,
+        vis_steps=500,
+        log_steps=50,
+        save_steps=5000,
+        flush_secs=30,
+        upload_path=None,
+    ):
         # Input values checks
         ints_to_check = {
-            'num_steps': num_steps,
-            'n_dis': n_dis,
-            'print_steps': print_steps,
-            'vis_steps': vis_steps,
-            'log_steps': log_steps,
-            'save_steps': save_steps,
-            'flush_secs': flush_secs
+            "num_steps": num_steps,
+            "n_dis": n_dis,
+            "print_steps": print_steps,
+            "vis_steps": vis_steps,
+            "log_steps": log_steps,
+            "save_steps": save_steps,
+            "flush_secs": flush_secs,
         }
         for name, var in ints_to_check.items():
             if var < 1:
-                raise ValueError('{} must be at least 1 but got {}.'.format(
-                    name, var))
+                raise ValueError("{} must be at least 1 but got {}.".format(name, var))
 
         self.netD = netD
         self.netG = netG
@@ -91,53 +96,54 @@ class Trainer:
             os.makedirs(self.log_dir)
 
         # Training helper objects
-        self.logger = logger.Logger(log_dir=self.log_dir,
-                                    num_steps=self.num_steps,
-                                    dataset_size=len(self.dataloader),
-                                    flush_secs=flush_secs,
-                                    device=self.device)
+        self.logger = logger.Logger(
+            log_dir=self.log_dir,
+            num_steps=self.num_steps,
+            dataset_size=len(self.dataloader),
+            flush_secs=flush_secs,
+            device=self.device,
+        )
 
-        self.scheduler = scheduler.LRScheduler(lr_decay=self.lr_decay,
-                                               optD=self.optD,
-                                               optG=self.optG,
-                                               num_steps=self.num_steps)
+        self.scheduler = scheduler.LRScheduler(
+            lr_decay=self.lr_decay,
+            optD=self.optD,
+            optG=self.optG,
+            num_steps=self.num_steps,
+        )
 
         # Obtain custom or latest checkpoint files
         if self.netG_ckpt_file:
             self.netG_ckpt_dir = os.path.dirname(netG_ckpt_file)
             self.netG_ckpt_file = netG_ckpt_file
         else:
-            self.netG_ckpt_dir = os.path.join(self.log_dir, 'checkpoints',
-                                              'netG')
+            self.netG_ckpt_dir = os.path.join(self.log_dir, "checkpoints", "netG")
             self.netG_ckpt_file = self._get_latest_checkpoint(
-                self.netG_ckpt_dir)  # can be None
+                self.netG_ckpt_dir
+            )  # can be None
 
         if self.netD_ckpt_file:
             self.netD_ckpt_dir = os.path.dirname(netD_ckpt_file)
             self.netD_ckpt_file = netD_ckpt_file
         else:
-            self.netD_ckpt_dir = os.path.join(self.log_dir, 'checkpoints',
-                                              'netD')
-            self.netD_ckpt_file = self._get_latest_checkpoint(
-                self.netD_ckpt_dir)
+            self.netD_ckpt_dir = os.path.join(self.log_dir, "checkpoints", "netD")
+            self.netD_ckpt_file = self._get_latest_checkpoint(self.netD_ckpt_dir)
 
         # Log hyperparameters for experiments
         self.params = {
-            'log_dir': self.log_dir,
-            'num_steps': self.num_steps,
-            'batch_size': self.dataloader.batch_size,
-            'n_dis': self.n_dis,
-            'lr_decay': self.lr_decay,
-            'optD': optD.__repr__(),
-            'optG': optG.__repr__(),
-            'save_steps': self.save_steps,
+            "log_dir": self.log_dir,
+            "num_steps": self.num_steps,
+            "batch_size": self.dataloader.batch_size,
+            "n_dis": self.n_dis,
+            "lr_decay": self.lr_decay,
+            "optD": optD.__repr__(),
+            "optG": optG.__repr__(),
+            "save_steps": self.save_steps,
         }
         self._log_params(self.params)
 
         # Device for hosting model and data
         if not self.device:
-            self.device = torch.device(
-                'cuda:0' if torch.cuda.is_available() else "cpu")
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Ensure model and data are in the same device
         for net in [self.netD, self.netG]:
@@ -148,7 +154,7 @@ class Trainer:
         """
         Takes the argument options to save into a json file.
         """
-        params_file = os.path.join(self.log_dir, 'params.json')
+        params_file = os.path.join(self.log_dir, "params.json")
 
         # Check for discrepancy with previous training config.
         if os.path.exists(params_file):
@@ -158,13 +164,16 @@ class Trainer:
                 diffs = []
                 for k in params:
                     if k in check and params[k] != check[k]:
-                        diffs.append('{}: Expected {} but got {}.'.format(
-                            k, check[k], params[k]))
+                        diffs.append(
+                            "{}: Expected {} but got {}.".format(k, check[k], params[k])
+                        )
 
-                diff_string = '\n'.join(diffs)
+                diff_string = "\n".join(diffs)
                 raise ValueError(
-                    "Current hyperparameter configuration is different from previously:\n{}"
-                    .format(diff_string))
+                    "Current hyperparameter configuration is different from previously:\n{}".format(
+                        diff_string
+                    )
+                )
 
         common.write_to_json(params, params_file)
 
@@ -172,16 +181,17 @@ class Trainer:
         """
         Given a checkpoint dir, finds the checkpoint with the latest training step.
         """
+
         def _get_step_number(k):
             """
             Helper function to get step number from checkpoint files.
             """
-            search = re.search(r'(\d+)_steps', k)
+            search = re.search(r"(\d+)_steps", k)
 
             if search:
                 return int(search.groups()[0])
             else:
-                return -float('inf')
+                return -float("inf")
 
         if not os.path.exists(ckpt_dir):
             return None
@@ -205,8 +215,7 @@ class Trainer:
             iter_dataloader = iter(self.dataloader)
             real_batch = next(iter_dataloader)
 
-        real_batch = (real_batch[0].to(self.device),
-                      real_batch[1].to(self.device))
+        real_batch = (real_batch[0].to(self.device), real_batch[1].to(self.device))
 
         return iter_dataloader, real_batch
 
@@ -219,15 +228,17 @@ class Trainer:
         if self.netD_ckpt_file and os.path.exists(self.netD_ckpt_file):
             print("INFO: Restoring checkpoint for D...")
             global_step_D = self.netD.restore_checkpoint(
-                ckpt_file=self.netD_ckpt_file, optimizer=self.optD)
+                ckpt_file=self.netD_ckpt_file, optimizer=self.optD
+            )
 
         if self.netG_ckpt_file and os.path.exists(self.netG_ckpt_file):
             print("INFO: Restoring checkpoint for G...")
             global_step_G = self.netG.restore_checkpoint(
-                ckpt_file=self.netG_ckpt_file, optimizer=self.optG)
+                ckpt_file=self.netG_ckpt_file, optimizer=self.optG
+            )
 
         if global_step_G != global_step_D:
-            raise ValueError('G and D Networks are out of sync.')
+            raise ValueError("G and D Networks are out of sync.")
         else:
             global_step = global_step_G  # Restores global step
 
@@ -237,13 +248,13 @@ class Trainer:
         """
         Saves both discriminator and generator checkpoints.
         """
-        self.netG.save_checkpoint(directory=self.netG_ckpt_dir,
-                                  global_step=global_step,
-                                  optimizer=self.optG)
+        self.netG.save_checkpoint(
+            directory=self.netG_ckpt_dir, global_step=global_step, optimizer=self.optG
+        )
 
-        self.netD.save_checkpoint(directory=self.netD_ckpt_dir,
-                                  global_step=global_step,
-                                  optimizer=self.optD)
+        self.netD.save_checkpoint(
+            directory=self.netD_ckpt_dir, global_step=global_step, optimizer=self.optD
+        )
 
     def train(self):
         """
@@ -251,8 +262,7 @@ class Trainer:
         """
         # Restore models
         global_step = self._restore_models_and_step()
-        print("INFO: Starting training from global step {}...".format(
-            global_step))
+        print("INFO: Starting training from global step {}...".format(global_step))
 
         try:
             start_time = time.time()
@@ -268,17 +278,20 @@ class Trainer:
                 # Update n_dis times for D
                 for i in range(self.n_dis):
                     iter_dataloader, real_batch = self._fetch_data(
-                        iter_dataloader=iter_dataloader)
+                        iter_dataloader=iter_dataloader
+                    )
 
                     # ------------------------
                     #   Update D Network
                     # -----------------------
-                    log_data = self.netD.train_step(real_batch=real_batch,
-                                                    netG=self.netG,
-                                                    optD=self.optD,
-                                                    log_data=log_data,
-                                                    global_step=global_step,
-                                                    device=self.device)
+                    log_data = self.netD.train_step(
+                        real_batch=real_batch,
+                        netG=self.netG,
+                        optD=self.optD,
+                        log_data=log_data,
+                        global_step=global_step,
+                        device=self.device,
+                    )
 
                     # -----------------------
                     #   Update G Network
@@ -291,38 +304,42 @@ class Trainer:
                             optG=self.optG,
                             global_step=global_step,
                             log_data=log_data,
-                            device=self.device)
+                            device=self.device,
+                        )
 
                 # --------------------------------
                 #   Update Training Variables
                 # -------------------------------
                 global_step += 1
 
-                log_data = self.scheduler.step(log_data=log_data,
-                                               global_step=global_step)
+                log_data = self.scheduler.step(
+                    log_data=log_data, global_step=global_step
+                )
 
                 # -------------------------
                 #   Logging and Metrics
                 # -------------------------
                 if global_step % self.log_steps == 0:
-                    self.logger.write_summaries(log_data=log_data,
-                                                global_step=global_step)
+                    self.logger.write_summaries(
+                        log_data=log_data, global_step=global_step
+                    )
 
                 if global_step % self.print_steps == 0:
                     curr_time = time.time()
-                    self.logger.print_log(global_step=global_step,
-                                          log_data=log_data,
-                                          time_taken=(curr_time - start_time) /
-                                          self.print_steps)
+                    self.logger.print_log(
+                        global_step=global_step,
+                        log_data=log_data,
+                        time_taken=(curr_time - start_time) / self.print_steps,
+                    )
                     start_time = curr_time
 
                 if global_step % self.vis_steps == 0:
-                    self.logger.vis_images(netG=self.netG,
-                                           global_step=global_step)
+                    self.logger.vis_images(netG=self.netG, global_step=global_step)
 
                 if global_step % self.save_steps == 0:
                     print("INFO: Saving checkpoints...")
                     self._save_model_checkpoints(global_step)
+                    shutil.copytree(self.log_dir, self.upload_path)
 
             print("INFO: Saving final checkpoints...")
             self._save_model_checkpoints(global_step)
