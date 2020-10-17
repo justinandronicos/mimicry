@@ -59,7 +59,6 @@ class Trainer:
         log_steps=50,
         save_steps=5000,
         flush_secs=30,
-        upload_path=None,
     ):
         # Input values checks
         ints_to_check = {
@@ -256,7 +255,7 @@ class Trainer:
             directory=self.netD_ckpt_dir, global_step=global_step, optimizer=self.optD
         )
 
-    def train(self):
+    def train(self, upload_path=None):
         """
         Runs the training pipeline with all given parameters in Trainer.
         """
@@ -339,7 +338,7 @@ class Trainer:
                 if global_step % self.save_steps == 0:
                     print("INFO: Saving checkpoints...")
                     self._save_model_checkpoints(global_step)
-                    shutil.copytree(self.log_dir, self.upload_path)
+                    shutil.copytree(self.log_dir, upload_path)
 
             print("INFO: Saving final checkpoints...")
             self._save_model_checkpoints(global_step)
