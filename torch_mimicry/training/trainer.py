@@ -338,7 +338,8 @@ class Trainer:
                 if global_step % self.save_steps == 0:
                     print("INFO: Saving checkpoints...")
                     self._save_model_checkpoints(global_step)
-                    shutil.copytree(self.log_dir, upload_path)
+                    if upload_path is not None:
+                        shutil.copytree(self.log_dir, upload_path)
 
             print("INFO: Saving final checkpoints...")
             self._save_model_checkpoints(global_step)
