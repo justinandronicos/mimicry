@@ -343,7 +343,7 @@ class Trainer:
                         result = subprocess.call(call_string, shell=True)
                         if result is 0:
                             print("INFO: Upload checkpoints SUCCESSFUL")
-                        else if result is 1:
+                        elif result is 1:
                             print("INFO: Upload checkpoints FAILED")
 
             print("INFO: Saving final checkpoints...")
