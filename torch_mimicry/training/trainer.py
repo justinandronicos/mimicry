@@ -339,7 +339,7 @@ class Trainer:
                     print("INFO: Saving checkpoints...")
                     self._save_model_checkpoints(global_step)
                     if upload_path is not None:
-                        call_string = "cp -r " + "'" + self.log_dir + "'" +  " " + "'" + upload_path + "'"
+                        call_string = "rsync --update -arq " + "'" + self.log_dir + "'" +  " " + "'" + upload_path + "'"
                         result = subprocess.call(call_string, shell=True)
                         if result is 0:
                             print("INFO: Upload checkpoints SUCCESSFUL")
