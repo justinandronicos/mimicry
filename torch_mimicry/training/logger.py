@@ -261,20 +261,16 @@ class Logger:
                     'fixed_fake': fixed_fake_images
                 }
 
-            # Visualise all results
-            for name, images in images_dict.items():
-                images_viz = vutils.make_grid(images,
-                                              padding=2,
-                                              normalize=True)
+        # Visualise all results
+        for name, images in images_dict.items():
+            vutils.save_image(images,
+                                '{}/{}_samples_step_{}.png'.format(
+                                    img_dir, name, global_step),
+                                normalize=True)
 
-                vutils.save_image(images_viz,
-                                  '{}/{}_samples_step_{}.png'.format(
-                                      img_dir, name, global_step),
-                                  normalize=True)
+            if 'img' not in self.writers:
+                self.writers['img'] = self._build_writer('img')
 
-                if 'img' not in self.writers:
-                    self.writers['img'] = self._build_writer('img')
-
-                self.writers['img'].add_image('{}_vis'.format(name),
-                                              images_viz,
-                                              global_step=global_step)
+            self.writers['img'].add_image('{}_vis'.format(name),
+                                            images,
+                                            global_step=global_step)
